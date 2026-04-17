@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENTRENADOR FITNESS OS</title>
+    <style>
+        :root {
+            --bg-dark: #0a0a0a; --bg-card: #151515; --text-main: #f0f0f0;
+            --hal-red: #ff0000; --hal-glow: #ff4d4d; --hal-dim: rgba(255, 0, 0, 0.1);
+            --blue-water: #00b4d8;
+        }
+        body { font-family: 'Courier New', monospace; background-color: var(--bg-dark); color: var(--text-main); margin: 0; padding: 15px; display: flex; justify-content: center; min-height: 100vh; }
+        .container { max-width: 800px; width: 100%; display: grid; gap: 15px; }
+        .app-title { text-align: center; border: 1px solid var(--hal-red); padding: 15px; background: black; box-shadow: inset 0 0 10px var(--hal-red); }
+        .app-title h1 { color: var(--hal-red); margin: 0; font-size: 1.8rem; letter-spacing: 3px; }
+        .xp-container { width: 100%; height: 6px; background: #222; margin-top: 10px; border: 1px solid #444; }
+        #xp-bar { height: 100%; width: 0%; background: var(--hal-red); box-shadow: 0 0 8px var(--hal-red); transition: width 1.5s; }
+        .health-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .health-card { background: #111; padding: 12px; border: 1px solid #333; text-align: center; }
+        .health-card input { background: transparent; border: none; border-bottom: 1px solid var(--hal-red); color: var(--hal-red); width: 80px; font-size: 1.2rem; text-align: center; outline: none; }
+        .card { background-color: var(--bg-card); border: 1px solid #333; padding: 20px; position: relative; }
+        .section-title { color: whitesmoke; font-size: 0.9rem; font-weight: bold; text-transform: uppercase; margin-bottom: 15px; border-left: 3px solid var(--hal-red); padding-left: 10px; }
+        
+        /* HAL EYE CENTRADO */
+        .hal-eye-container { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px; margin-bottom: 15px; background: rgba(255,0,0,0.05); padding: 20px; border: 1px solid var(--hal-dim); text-align: center; }
+        .hal-eye { width: 40px; height: 40px; background: radial-gradient(circle, #ff0000 0%, #660000 70%, #000 100%); border-radius: 50%; border: 2px solid #333; box-shadow: 0 0 15px var(--hal-red); animation: blink 3s infinite; }
+        #ia-status-text { font-size: 0.9rem; color: var(--blue-water); font-weight: border; font-family: "Verdana"; font-style: italic; max-width: 90%; line-height: 1.3; }
+        
+        @keyframes blink { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } }
+
+        /* ESCALA DE FATIGA */
+        .fatigue-box { margin-top: 15px; border-top: 1px solid #333; padding-top: 15px; display: none; }
+        .fatigue-range { width: 100%; accent-color: var(--hal-red); cursor: pointer; }
+
+        .btn-save { width: 100%; background: green>; color: black; border: none; padding: 18px; font-weight: bold; cursor: pointer; font-size: 1.1rem; text-transform: uppercase; margin-top: 10px; }
+        .btn-save:disabled { background: #222; color: #666; cursor: not-allowed; }
+        .btn-tool { flex: 1; min-width: 80px; background: #222; color: #888; border: 1px solid #444; padding: 10px; font-size: 0.6rem; cursor: pointer; text-transform: uppercase; }
+        .exercise-step { background: #000; padding: 20px; border: 1px solid #333; text-align: center; display: none; margin-bottom: 10px; }
+        .btn-next { background: #111; color: var(--hal-red); border: 1px solid var(--hal-red); padding: 10px 20px; cursor: pointer; margin-top: 10px; font-family: 'Courier New'; font-weight: bold; }
+        .media-box { background: #000; padding: 15px; border: 1px solid var(--blue-water); margin-top: 10px; }
+        #canvas-visualizer { width: 100%; height: 40px; }
+        #history-panel { display: none; background: rgba(0,0,0,0.98); position: fixed; top:0; left:0; width:100%; height:100%; z-index: 1000; padding: 20px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="app-title">
+        <h1>ENTRENADOR FITNESS OS</h1>
+        <div class="xp-container"><div id="xp-bar"></div></div>
+        <div style="display:flex; justify-content:space-between; font-size:0.6rem; color:var(--hal-red); margin-top:5px;">
+            <span id="level-text">CARGANDO...</span>
+            <span id="streak-text">RACHA: 0 DÍAS</span>
+        </div>
+    </div>
+
+    <div class="health-grid">
+        <div class="health-card">
+            <span style="font-size:0.6rem; color:#666;">MASA (KG)</span><br>
+            <input type="number" id="input-peso" step="0.1" onchange="calcWater()">
+        </div>
+        <div class="health-card">
+            <span style="font-size:0.6rem; color:#666;">H2O OBJETIVO</span><br>
+            <span id="water-target" style="color:var(--blue-water); font-weight:bold; font-size:1.2rem;">--</span>
+        </div>
+    </div>
+
+    <div id="training-content" class="card">
+        <div class="hal-eye-container">
+            <div class="hal-eye"></div>
+            <div id="ia-status-text">Iniciando sistemas de misión...</div>
+        </div>
+
+        <h2 id="session-type" class="section-title">PROTOCOLO AE-35</h2>
+        
+        <div id="view-cardio" style="display:none; text-align:center;">
+            <div id="cardio-timer-display" style="font-size: 4rem; font-weight: 900; color: var(--hal-red); text-shadow: 0 0 10px var(--hal-red);">00:00</div>
+            <p style="font-size:0.8rem; letter-spacing:2px;">TIEMPO PARA FINALIZACIÓN</p>
+            <button onclick="startCardioTimer()" id="btn-start-cardio" class="btn-next">INICIAR IGNICIÓN</button>
+            <span id="cardio-time" style="display:none;">20</span>
+        </div>
+
+        <div id="view-fuerza" style="display:none;">
+            <div id="fuerza-pre-start" style="text-align:center;">
+                <button onclick="iniciarProtocoloFuerza()" class="btn-next" style="width:100%; padding:20px;">ACTIVAR PROTOCOLO DE FUERZA</button>
+            </div>
+            <div id="fuerza-active-zone" style="display:none;">
+                <div style="text-align:center; margin-bottom:15px; border:1px solid #333; padding:10px;">
+                    <span id="fuerza-timer" style="font-size:2rem; color:white; font-family:monospace;">00:00</span>
+                </div>
+                <div id="step-1" class="exercise-step"><h3>SENTADILLAS</h3><p id="info-s"></p><button onclick="nextStep(2)" class="btn-next">LISTO</button></div>
+                <div id="step-2" class="exercise-step"><h3>ABDOMINALES</h3><p id="info-a"></p><button onclick="nextStep(3)" class="btn-next">LISTO</button></div>
+                <div id="step-3" class="exercise-step"><h3>PESAS: FRONTAL</h3><p id="info-pf"></p><button onclick="nextStep(4)" class="btn-next">LISTO</button></div>
+                <div id="step-4" class="exercise-step"><h3>PESAS: LATERAL</h3><p id="info-pl"></p><button onclick="finalizarFuerza()" class="btn-next">FINALIZAR</button></div>
+                <button id="btn-rest" onclick="startRest()" style="width:100%; background:#222; color:var(--hal-red); border:1px solid #444; padding:10px; cursor:pointer; margin-top:10px;">DESCANSO (60s)</button>
+            </div>
+        </div>
+
+        <div id="fatigue-panel" class="fatigue-box">
+            <p style="font-size:0.7rem; color:red; text-align:center;">¿ESTADO DE FATIGA TRAS LA MISIÓN? (1-10)</p>
+            <input type="range" id="fatigue-input" class="fatigue-range" min="1" max="10" value="5" oninput="updateFatigueValue(this.value)">
+            <p id="fatigue-value" style="text-align:center; font-weight:bold; color:white;">5 - MODERADO</p>
+        </div>
+
+        <button id="btn-mision-cumplida" class="btn-save" onclick="saveSession()" style="display:none;">MISIÓN CUMPLIDA ✓</button>
+
+        <div class="media-box">
+            <canvas id="canvas-visualizer"></canvas>
+            <marquee id="track-name" scrollamount="3" style="font-size:0.9rem; color:var(--blue-water); display:block; margin:5px 0;">SISTEMA DE AUDIO LISTO</marquee>
+            <input type="file" id="music-files" multiple accept="audio/*" onchange="handleFiles()" style="font-size:0.6rem; color:#666; width:100%;">
+            <div class="music-controls" style="display:flex; justify-content:center; gap:10px; margin-top:10px;">
+                <button class="btn-track" onclick="prevTrack()">⏮</button>
+                <button class="btn-track" id="play-pause" onclick="togglePlay()">▶</button>
+                <button class="btn-track" onclick="nextTrack()">⏭</button>
+                <button class="btn-track" id="btn-shuffle" onclick="toggleShuffle()">🔀</button>
+            </div>
+            <audio id="audio-player" style="display:none;"></audio>
+        </div>
+    </div>
+
+    <button onclick="toggleControlPanel()" style="width: 100%; background: #111; color: #ff0000; border: 1px solid #ff0000; padding: 10px; font-family: 'Courier New'; cursor: pointer; font-size: 0.7rem; letter-spacing: 2px;">
+        [ TELEMETRÍA DE PROGRESO ]
+    </button>
+    <div id="panel-telemetria" style="display: none; background: #050505; border: 2px solid #ff0000; padding: 15px; margin-bottom: 10px;">
+        <span id="stat-bmi" style="color: #fff; font-size: 1.5rem; font-weight: bold; display:block; text-align:center; margin-bottom:10px;">---</span>
+        <canvas id="progreso-chart" style="width:100%; height:150px;"></canvas>
+    </div>
+
+    <div style="display: flex; gap: 5px;">
+        <button class="btn-tool" onclick="exportCSV()">EXPORT CSV</button>
+        <button class="btn-tool" onclick="document.getElementById('csv-import').click()">IMPORT CSV</button>
+        <button class="btn-tool" onclick="toggleHistory()">HISTORIAL</button>
+    </div>
+    <input type="file" id="csv-import" style="display:none" onchange="importCSV(event)">
+</div>
+
+<div id="history-panel">
+    <button onclick="toggleHistory()" style="background:var(--hal-red); border:none; padding:15px; width:100%; font-weight:bold; cursor:pointer;">CERRAR TERMINAL</button>
+    <div id="history-list" style="margin-top:20px;"></div>
+</div>
+
+<script>
+    let db, playlist = [], currentTrackIndex = 0, isShuffle = false;
+    let audioCtx, analyser, dataArray, timerInterval, segundosFuerza = 0;
+    let visualizerColor = "red";
+    const player = document.getElementById('audio-player');
+    const playBtn = document.getElementById('play-pause');
+    const canvas = document.getElementById('canvas-visualizer');
+    const canvasCtx = canvas.getContext('2d');
+
+    const request = indexedDB.open("FitnessHAL_9000", 3);
+    request.onupgradeneeded = e => {
+        let db = e.target.result;
+        if (!db.objectStoreNames.contains("logs")) db.createObjectStore("logs", { autoIncrement: true });
+    };
+    request.onsuccess = e => { db = e.target.result; initApp(); };
+
+    function initApp() {
+        const sw = localStorage.getItem('userWeight') || 105;
+        document.getElementById('input-peso').value = sw; calcWater();
+        db.transaction("logs").objectStore("logs").getAll().onsuccess = e => {
+            const logs = e.target.result;
+            actualizarXP(logs);
+            calcularRacha(logs);
+            runIA(logs);
+            checkTodayStatus(logs);
+        };
+    }
+
+    // --- MOTOR DE RACHA Y NIVELES ---
+    function calcularRacha(logs) {
+        if (logs.length === 0) return;
+        let racha = 0;
+        let hoy = new Date();
+        hoy.setHours(0,0,0,0);
+        let tempFecha = new Date(hoy);
+
+        const fechas = logs.map(l => {
+            let d = new Date(l.date);
+            d.setHours(0,0,0,0);
+            return d.getTime();
+        }).reverse();
+
+        let uniqueFechas = [...new Set(fechas)];
+        
+        for(let i=0; i < uniqueFechas.length; i++) {
+            if (uniqueFechas[i] === tempFecha.getTime()) {
+                racha++;
+                tempFecha.setDate(tempFecha.getDate() - 1);
+            } else if (i === 0) { // Si hoy no entrenó, miramos si ayer sí
+                tempFecha.setDate(tempFecha.getDate() - 1);
+                if (uniqueFechas[i] === tempFecha.getTime()) {
+                    racha++;
+                    tempFecha.setDate(tempFecha.getDate() - 1);
+                } else break;
+            } else break;
+        }
+        document.getElementById('streak-text').innerText = `RACHA: ${racha} DÍAS`;
+    }
+
+    function actualizarXP(logs) {
+        const total = logs.length;
+        document.getElementById('xp-bar').style.width = (total % 10 * 10) + "%";
+        document.getElementById('level-text').innerText = `NIVEL: ${Math.floor(total/10) + 1} (${total} SESIONES)`;
+    }
+
+    function checkTodayStatus(logs) {
+        const hoy = new Date().toLocaleDateString();
+        if (logs.some(log => new Date(log.date).toLocaleDateString() === hoy)) {
+            document.getElementById('btn-mision-cumplida').style.display = "block";
+            document.getElementById('btn-mision-cumplida').innerText = "MISIÓN DE HOY REGISTRADA";
+            document.getElementById('btn-mision-cumplida').disabled = true;
+            document.getElementById('view-cardio').style.display = "none";
+            document.getElementById('view-fuerza').style.display = "none";
+            document.getElementById('ia-status-text').innerText = '"Sistemas en reposo. Recupere integridad estructural."';
+        }
+    }
+
+    // --- LÓGICA DE INTELIGENCIA ARTIFICIAL Y SEGURIDAD ---
+    function runIA(logs) {
+        const total = logs.length;
+        const dayNum = new Date().getDay();
+        const mode = (dayNum === 2 || dayNum === 4 || dayNum === 6) ? "cardio" : (dayNum === 0 ? "descanso" : "fuerza");
+        
+        // 1. Analizar Fatiga Reciente (Últimos 3 registros)
+        let ultimosLogs = logs.slice(-3);
+        let fatigaMedia = 0;
+        if(ultimosLogs.length > 0) {
+            let suma = ultimosLogs.reduce((acc, log) => acc + parseInt(log.fatigue || 5), 0);
+            fatigaMedia = suma / ultimosLogs.length;
+        }
+
+        let multiplicadorIntensidad = 1.0;
+        let mensajeSeguridad = "";
+        let bloqueoMision = false;
+
+        // 2. Aplicar Directivas de Seguridad
+        if (fatigaMedia > 8) {
+            bloqueoMision = true;
+            mensajeSeguridad = "⚠️ ERROR CRÍTICO: FATIGA ACUMULADA PELIGROSA. DIRECTIVA 7 ACTIVA: DESCANSO OBLIGATORIO. NO SE PERMITE IGNICIÓN.";
+        } else if (fatigaMedia >= 5) {
+            multiplicadorIntensidad = 0.7; // Reduce un 30% la carga
+            mensajeSeguridad = "⚠️ AVISO: Nivel de fatiga moderado. Reduciendo intensidad de misión para preservar integridad física.";
+        }
+
+        // 3. Configurar Sesión
+        if (bloqueoMision) {
+            document.getElementById('ia-status-text').innerText = mensajeSeguridad;
+            document.getElementById('ia-status-text').style.color = "#ffff00";
+            document.getElementById('view-cardio').innerHTML = `<h3 style="color:red">ACCESO DENEGADO</h3><p>${mensajeSeguridad}</p>`;
+            document.getElementById('view-fuerza').innerHTML = `<h3 style="color:red">ACCESO DENEGADO</h3><p>${mensajeSeguridad}</p>`;
+            document.getElementById('view-cardio').style.display = "block";
+            return;
+        }
+
+        if (mode === "cardio") {
+            document.getElementById('view-cardio').style.display = "block";
+            let minsOriginales = 20 + total;
+            let minsAjustados = Math.round(minsOriginales * multiplicadorIntensidad);
+            document.getElementById('cardio-time').innerText = minsAjustados;
+            document.getElementById('cardio-timer-display').innerText = minsAjustados + ":00";
+            if(mensajeSeguridad) document.getElementById('ia-status-text').innerText = mensajeSeguridad;
+        } 
+        else if (mode === "fuerza") {
+            document.getElementById('view-fuerza').style.display = "block";
+            let repOriginales = 12 + Math.floor(total/5);
+            let repAjustadas = Math.round(repOriginales * multiplicadorIntensidad);
+            const info = `3 SERIES x ${repAjustadas} REPS ${multiplicadorIntensidad < 1 ? '(AJUSTADO)' : ''}`;
+            document.getElementById('info-s').innerText = info;
+            document.getElementById('info-a').innerText = info;
+            document.getElementById('info-pf').innerText = info;
+            document.getElementById('info-pl').innerText = info;
+            if(mensajeSeguridad) document.getElementById('ia-status-text').innerText = mensajeSeguridad;
+        }
+    }
+
+    // --- PROTOCOLO FUERZA ---
+    function iniciarProtocoloFuerza() {
+        initAudioContext();
+        document.getElementById('fuerza-pre-start').style.display = 'none';
+        document.getElementById('fuerza-active-zone').style.display = 'block';
+        document.getElementById('step-1').style.display = 'block';
+        setInterval(() => {
+            segundosFuerza++;
+            let m = Math.floor(segundosFuerza/60), s = segundosFuerza%60;
+            document.getElementById('fuerza-timer').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        }, 1000);
+    }
+    function nextStep(n) { playBeep(); document.querySelectorAll('.exercise-step').forEach(s=>s.style.display='none'); document.getElementById('step-'+n).style.display='block'; }
+    function finalizarFuerza() { playBeep(); document.querySelectorAll('.exercise-step').forEach(s=>s.style.display='none'); mostrarFatiga(); }
+
+    function mostrarFatiga() {
+        document.getElementById('fatigue-panel').style.display = 'block';
+        document.getElementById('btn-mision-cumplida').style.display = 'block';
+    }
+    function updateFatigueValue(val) {
+        const labels = ["","Mínima","Leve","Baja","Normal","Moderada","Notable","Alta","Fuerte","Muy Alta","CRÍTICA"];
+        document.getElementById('fatigue-value').innerText = `${val} - ${labels[val]}`;
+    }
+
+    // --- AUDIO & SISTEMA ---
+    function initAudioContext() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioCtx.createAnalyser();
+            const source = audioCtx.createMediaElementSource(player);
+            source.connect(analyser); analyser.connect(audioCtx.destination);
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+            draw();
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+    function playBeep() {
+        initAudioContext(); const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); gain.gain.setValueAtTime(0, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+    }
+    function startCardioTimer() {
+        initAudioContext(); let ts = parseInt(document.getElementById('cardio-time').innerText) * 60;
+        document.getElementById('btn-start-cardio').style.display = 'none';
+        timerInterval = setInterval(() => {
+            ts--; let m = Math.floor(ts/60), s = ts%60;
+            document.getElementById('cardio-timer-display').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+            if(ts===120){ player.volume = 1.0; visualizerColor = "white"; }
+            if(ts===2){ player.pause(); visualizerColor = "red"; }
+            if(ts<=0){ clearInterval(timerInterval); playBeep(); mostrarFatiga(); }
+        }, 1000);
+    }
+
+    function startRest() {
+        let d = 60; const btn = document.getElementById('btn-rest'); btn.disabled = true;
+        const ri = setInterval(() => { d--; btn.innerText = `DESCANSO: ${d}s`; if(d<=0){ clearInterval(ri); playBeep(); btn.disabled=false; btn.innerText="INICIAR DESCANSO (60s)"; } }, 1000);
+    }
+
+    function draw() { requestAnimationFrame(draw); analyser.getByteFrequencyData(dataArray); canvasCtx.fillStyle = '#000'; canvasCtx.fillRect(0,0,canvas.width,canvas.height); let x=0; for(let i=0;i<32;i++){ let h=dataArray[i]/5; canvasCtx.fillStyle=visualizerColor; canvasCtx.fillRect(x,canvas.height-h,4,h); x+=6; } }
+    function handleFiles() { playlist = Array.from(document.getElementById('music-files').files); if(playlist.length>0) playTrack(0); }
+    function playTrack(idx) { initAudioContext(); player.src = URL.createObjectURL(playlist[idx]); player.play(); playBtn.innerText = "⏸"; }
+    function togglePlay() { if(player.paused){player.play(); playBtn.innerText="⏸";} else {player.pause(); playBtn.innerText="▶";} }
+    function nextTrack() { currentTrackIndex = (currentTrackIndex+1)%playlist.length; playTrack(currentTrackIndex); }
+    function prevTrack() { currentTrackIndex = (currentTrackIndex-1+playlist.length)%playlist.length; playTrack(currentTrackIndex); }
+    player.onended = () => nextTrack();
+
+    function saveSession() {
+        const tx = db.transaction("logs", "readwrite");
+        const act = document.getElementById('view-cardio').style.display === "block" ? "Cardio" : "Fuerza";
+        tx.objectStore("logs").add({ 
+            date: new Date().toISOString(), 
+            weight: document.getElementById('input-peso').value, 
+            activity: act,
+            fatigue: document.getElementById('fatigue-input').value
+        });
+        tx.oncomplete = () => location.reload();
+    }
+    function calcWater() { const p = document.getElementById('input-peso').value; document.getElementById('water-target').innerText = (p*0.035).toFixed(1)+"L"; localStorage.setItem('userWeight', p); }
+    function toggleHistory() {
+        const p = document.getElementById('history-panel'); p.style.display = p.style.display === "block"?"none":"block";
+        if(p.style.display==="block") db.transaction("logs").objectStore("logs").getAll().onsuccess = e => {
+            document.getElementById('history-list').innerHTML = e.target.result.reverse().map(l => `<div style="padding:10px; border-bottom:1px solid #222;">${new Date(l.date).toLocaleDateString()} - ${l.weight}kg - FATIGA: ${l.fatigue || 'N/A'}</div>`).join('');
+        };
+    }
+    function exportCSV() { db.transaction("logs").objectStore("logs").getAll().onsuccess = e => { let csv = "Fecha,Peso,Actividad,Fatiga\n"+e.target.result.map(l=>`${l.date},${l.weight},${l.activity},${l.fatigue}`).join("\n"); let a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download="hal_log.csv"; a.click(); }; }
+    function importCSV(ev) {
+        const r = new FileReader(); r.onload = e => {
+            const lines = e.target.result.split("\n").slice(1); const tx = db.transaction("logs", "readwrite");
+            lines.forEach(l => { if(l) { const [d,w,a,f] = l.split(","); tx.objectStore("logs").add({date:d, weight:w, activity:a, fatigue:f}); } });
+            tx.oncomplete = () => location.reload();
+        }; r.readAsText(ev.target.files[0]);
+    }
+    function toggleControlPanel() {
+        const p = document.getElementById('panel-telemetria');
+        if(p.style.display==="none"){ p.style.display="block"; db.transaction("logs").objectStore("logs").getAll().onsuccess = e => dibujarGrafica(e.target.result); }
+        else p.style.display="none";
+    }
+    function dibujarGrafica(logs) {
+        const cg = document.getElementById('progreso-chart'); const ctx = cg.getContext('2d');
+        cg.width = cg.offsetWidth; cg.height = cg.offsetHeight; if(logs.length<2) return;
+        const pesos = logs.map(l => parseFloat(l.weight));
+        const max = Math.max(...pesos)+0.5, min = Math.min(...pesos)-0.5;
+        document.getElementById('stat-bmi').innerText = (pesos[0]-pesos[pesos.length-1]).toFixed(1) + " KG PERDIDOS";
+        ctx.clearRect(0,0,cg.width,cg.height); ctx.beginPath(); ctx.strokeStyle="red"; ctx.lineWidth=3;
+        pesos.forEach((p,i) => { const x=(cg.width/(pesos.length-1))*i, y=cg.height-((p-min)/(max-min))*cg.height; if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+        ctx.stroke();
+    }
+</script>
+</body>
+</html>
